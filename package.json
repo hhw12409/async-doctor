@@ -4,7 +4,7 @@
   "description": "Static analysis CLI that detects sequential async bottlenecks in Node.js/TypeScript code.",
   "type": "module",
   "bin": {
-    "async-doctor": "./dist/cli/bin.js"
+    "async-doctor": "dist/cli/bin.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
