@@ -1,5 +1,5 @@
-import path from "node:path";
 import type { Finding, Severity } from "../core/types.js";
+import { countBySeverity, relativePath } from "./shared.js";
 import type { ReportOptions, Reporter, ReportFormat } from "./types.js";
 
 const ANSI = {
@@ -47,16 +47,8 @@ function groupByFile(findings: Finding[]): Map<string, Finding[]> {
   return grouped;
 }
 
-function relative(filePath: string): string {
-  const rel = path.relative(process.cwd(), filePath);
-  return rel === "" || rel.startsWith("..") ? filePath : rel;
-}
-
 function summarize(findings: Finding[]): string {
-  const counts: Record<Severity, number> = { error: 0, warning: 0, info: 0 };
-  for (const finding of findings) {
-    counts[finding.severity] += 1;
-  }
+  const counts = countBySeverity(findings);
 
   const parts: string[] = [];
   if (counts.error > 0) parts.push(`${counts.error} error${counts.error === 1 ? "" : "s"}`);
@@ -83,7 +75,7 @@ export class ConsoleReporter implements Reporter {
     const lines: string[] = [];
 
     for (const [file, fileFindings] of groupByFile(findings)) {
-      lines.push(paint(relative(file), ANSI.underline, ANSI.bold));
+      lines.push(paint(relativePath(file), ANSI.underline, ANSI.bold));
 
       for (const finding of fileFindings) {
         const location = paint(`${finding.line}:${finding.column}`, ANSI.dim);

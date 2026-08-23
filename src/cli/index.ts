@@ -8,19 +8,23 @@
  */
 import { analyze } from "../analyzer/analyzer.js";
 import { collectFiles } from "../analyzer/file-discovery.js";
+import { VERSION } from "../core/package-info.js";
 import { isSeverity } from "../core/severity.js";
 import { consoleReporter } from "../reporter/console-reporter.js";
+import { jsonReporter } from "../reporter/json-reporter.js";
+import { sarifReporter } from "../reporter/sarif-reporter.js";
 import type { Reporter, ReportFormat } from "../reporter/types.js";
 import type { Severity } from "../core/types.js";
-
-const VERSION = "0.1.0";
 
 /**
  * --format 값 → Reporter 구현체 레지스트리.
  * 새 형식 추가는 Reporter를 구현하는 파일 하나 + 이 맵에 한 줄 등록으로 끝난다.
+ * 미등록 형식(html)은 아래 run()에서 데이터 기반 "not implemented" 에러로 처리된다.
  */
 const REPORTERS: Partial<Record<ReportFormat, Reporter>> = {
   text: consoleReporter,
+  json: jsonReporter,
+  sarif: sarifReporter,
 };
 
 const KNOWN_FORMATS: ReportFormat[] = ["text", "json", "sarif", "html"];
@@ -47,7 +51,7 @@ Arguments:
 
 Options:
   --verbose              Include the offending code snippet in the output
-  --format <format>      Output format: text (default). json/sarif/html are not implemented yet
+  --format <format>      Output format: text (default), json, sarif. html is not implemented yet
   --severity <level>     Only report findings at or above this level: error | warning | info
   -h, --help             Show this help
   -v, --version          Show version
@@ -55,7 +59,9 @@ Options:
 Examples:
   async-doctor src
   async-doctor src/user.service.ts --verbose
-  async-doctor src --severity warning --format text`;
+  async-doctor src --severity warning --format text
+  async-doctor src --format json
+  async-doctor src --format sarif > async-doctor.sarif`;
 
 function readValue(argv: string[], index: number, flag: string): string {
   const inlineIndex = argv[index].indexOf("=");
@@ -190,7 +196,10 @@ export function run(argv: string[]): number {
   }
 
   if (options.verbose) {
-    process.stdout.write(`Analyzing ${files.length} file(s)...\n\n`);
+    // 진행 상황은 **stderr**로 보낸다. stdout은 리포터 출력 전용이어야
+    // `--format json/sarif`를 파이프하거나 파일로 리다이렉트했을 때 문서가 깨지지 않는다.
+    // (TTY에서는 stdout/stderr가 함께 보이므로 사람이 보는 화면은 그대로다.)
+    process.stderr.write(`Analyzing ${files.length} file(s)...\n\n`);
   }
 
   let findings;

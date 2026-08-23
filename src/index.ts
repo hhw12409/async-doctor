@@ -25,3 +25,15 @@ export { rules } from "./rules/index.js";
 
 export type { Reporter, ReportOptions, ReportFormat } from "./reporter/types.js";
 export { ConsoleReporter, consoleReporter } from "./reporter/console-reporter.js";
+export { JsonReporter, jsonReporter, buildJsonReport } from "./reporter/json-reporter.js";
+export type { JsonReport, JsonReportSummary } from "./reporter/json-reporter.js";
+export {
+  SarifReporter,
+  sarifReporter,
+  buildSarifLog,
+  toSarifLevel,
+} from "./reporter/sarif-reporter.js";
+export type { SarifLog, SarifResult, SarifLevel } from "./reporter/sarif-reporter.js";
+export { relativePath, toPosixPath, countBySeverity } from "./reporter/shared.js";
+
+export { VERSION, HOMEPAGE } from "./core/package-info.js";

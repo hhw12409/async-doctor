@@ -27,9 +27,18 @@ async-doctor <path> [--verbose] [--format text] [--severity warning]
 - `<path>` — a single file or a directory (recursively scanned). Supported extensions:
   `.ts .tsx .js .jsx .mts .cts`.
 - `--verbose` — also print the offending code snippet.
-- `--format <format>` — output format. `text` is implemented; `json` / `sarif` / `html` are
-  reserved and reported as not implemented.
+- `--format <format>` — output format. `text` (default), `json` and `sarif` are implemented;
+  `html` is reserved and reported as not implemented.
 - `--severity <level>` — only report findings at or above `error` > `warning` > `info`.
+
+`--format json` always prints a valid JSON document (even with zero findings) shaped as
+`{ asyncDoctorVersion, summary: { total, error, warning, info }, findings: [...] }`, with
+absolute `file` paths so any consumer can resolve them.
+
+`--format sarif` prints a [SARIF 2.1.0](https://sarifweb.azurewebsites.net/) log that can be
+uploaded straight to GitHub Code Scanning (`github/codeql-action/upload-sarif`). File paths are
+repository-relative with POSIX separators, and `--verbose` additionally embeds the offending
+snippet in `region.snippet.text`.
 
 Examples:
 
@@ -37,6 +46,8 @@ Examples:
 async-doctor src
 async-doctor src/user.service.ts --verbose
 async-doctor src --severity warning
+async-doctor src --format json
+async-doctor src --format sarif > async-doctor.sarif
 ```
 
 Exit codes: `0` no findings, `1` findings reported, `2` usage or runtime error.
@@ -63,10 +74,14 @@ src/
   rules/index.ts           rule registry (the extension point)
   reporter/
     types.ts               Reporter interface
+    shared.ts              path/counting helpers shared by every reporter
     console-reporter.ts    text output
+    json-reporter.ts       machine-readable JSON output
+    sarif-reporter.ts      SARIF 2.1.0 output (GitHub Code Scanning)
   core/
     types.ts               Severity, Finding, AnalysisContext, AsyncDoctorRule
     severity.ts            severity ranking + threshold filtering
+    package-info.ts        VERSION / HOMEPAGE derived from package.json
   index.ts                 programmatic entrypoint
 ```
 
