@@ -18,7 +18,12 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
-      - run: npm ci
+      # npm ci is intentionally not used here: tsup's tinyglobby->fdir and ts-morph's
+      # fast-glob->micromatch require conflicting picomatch semver ranges, and npm resolves/
+      # writes that into the lockfile differently across npm versions. That makes `npm ci`
+      # (which requires an exact lockfile match) fail non-deterministically across the Node
+      # matrix even though the resulting install is fine. `npm install` resolves fresh instead.
+      - run: npm install
       - run: npm run typecheck
       - run: npm run lint
       - run: npx prettier --check .
