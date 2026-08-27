@@ -1,12 +1,44 @@
+<div align="center">
+
+<pre>
+~~~~/\/\/‾‾‾\/\~~~~
+</pre>
+
 # async-doctor
 
 [![npm version](https://img.shields.io/npm/v/async-doctor.svg)](https://www.npmjs.com/package/async-doctor)
 [![CI](https://github.com/hhw12409/async-doctor/actions/workflows/ci.yml/badge.svg)](https://github.com/hhw12409/async-doctor/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/async-doctor.svg)](./LICENSE)
 
-Static analysis CLI that detects async performance bottlenecks — independent asynchronous
-operations that are awaited sequentially when they could run concurrently — in Node.js /
-TypeScript code.
+**Static analysis for the async bottlenecks your linter doesn't catch.**
+
+</div>
+
+---
+
+`async-doctor` scans Node.js / TypeScript code for independent asynchronous operations that are
+awaited sequentially when they could run concurrently — a bug that compiles cleanly, passes tests,
+and only shows up as latency in production.
+
+```ts
+// ❌ sequential-await flags this — 200ms + 150ms, back to back
+const user = await getUser(id);
+const posts = await getPosts(id);
+
+// ✅ same result, latency = max(200ms, 150ms)
+const [user, posts] = await Promise.all([getUser(id), getPosts(id)]);
+```
+
+## Table of Contents
+
+- [Install](#install)
+- [Usage](#usage)
+- [Rules](#rules)
+- [Output Formats](#output-formats)
+- [Programmatic API](#programmatic-api)
+- [Architecture](#architecture)
+- [Development](#development)
+- [License](#license)
 
 ## Install
 
@@ -30,26 +62,39 @@ async-doctor <path> [--verbose] [--format text] [--severity warning]
 - `--format <format>` — output format: `text` (default), `json`, `sarif`, or `html`.
 - `--severity <level>` — only report findings at or above `error` > `warning` > `info`.
 
-`--format json` always prints a valid JSON document (even with zero findings) shaped as
-`{ asyncDoctorVersion, summary: { total, error, warning, info }, findings: [...] }`, with
-absolute `file` paths so any consumer can resolve them.
-
-`--format sarif` prints a [SARIF 2.1.0](https://sarifweb.azurewebsites.net/) log that can be
-uploaded straight to GitHub Code Scanning (`github/codeql-action/upload-sarif`). File paths are
-repository-relative with POSIX separators, and `--verbose` additionally embeds the offending
-snippet in `region.snippet.text`.
-
-Examples:
-
 ```bash
 async-doctor src
 async-doctor src/user.service.ts --verbose
 async-doctor src --severity warning
 async-doctor src --format json
 async-doctor src --format sarif > async-doctor.sarif
+async-doctor src --format html > report.html
 ```
 
 Exit codes: `0` no findings, `1` findings reported, `2` usage or runtime error.
+
+## Rules
+
+| Rule                                                | Detects                                                                                                                                                | Severity  |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
+| [`sequential-await`](src/rules/sequential-await.ts) | Consecutive `await`s that don't depend on each other's results and could run in parallel via `Promise.all`.                                            | `warning` |
+| [`no-await-in-loop`](src/rules/no-await-in-loop.ts) | `await` expressions executed one iteration at a time inside a loop instead of batched.                                                                 | `warning` |
+| [`no-foreach-async`](src/rules/no-foreach-async.ts) | `array.forEach(async (item) => { await ... })` — `forEach` never awaits the callback's promise, so errors are swallowed and ordering isn't guaranteed. | `warning` |
+
+Static analysis can't see runtime side effects, so every finding is a `warning`: fix the ones that
+apply, and keep the sequential form where the calls genuinely share state.
+
+## Output Formats
+
+| Format  | Use case                                                                                                 | Path style           |
+| ------- | -------------------------------------------------------------------------------------------------------- | -------------------- |
+| `text`  | Local development, terminal output                                                                       | relative to cwd      |
+| `json`  | CI/tooling consumption — `{ asyncDoctorVersion, summary, findings }`                                     | absolute             |
+| `sarif` | Upload straight to [GitHub Code Scanning](https://sarifweb.azurewebsites.net/) for inline PR annotations | repo-relative, POSIX |
+| `html`  | Self-contained single-file report to share or archive                                                    | relative to cwd      |
+
+`--format json` always prints a valid document, even with zero findings. `--format sarif` and
+`--format html` additionally embed the offending snippet via `--verbose`.
 
 ## Programmatic API
 
@@ -105,8 +150,8 @@ export const myRule: AsyncDoctorRule = {
 
 ### Adding a reporter
 
-Implement `Reporter` from `src/reporter/types.ts` in a new file and register it in the
-`REPORTERS` map in `src/cli/index.ts`.
+Implement `Reporter` from `src/reporter/types.ts` in a new file, register it in the `REPORTERS`
+map in `src/cli/index.ts`, and re-export it from `src/index.ts` for programmatic use.
 
 ## Development
 
