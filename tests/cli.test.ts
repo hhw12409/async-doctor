@@ -283,16 +283,46 @@ describe("CLI — run() 통합", () => {
     });
   });
 
-  describe("--format html — 미구현 회귀 방지", () => {
-    it("html은 여전히 exit 2와 not implemented 메시지를 낸다", () => {
+  describe("--format html", () => {
+    it("exit 1과 함께 <!doctype html>로 시작하는 문서를 낸다", () => {
       const { exitCode, stdout, stderr } = invoke([BOTTLENECK, "--format", "html"]);
 
-      expect(exitCode).toBe(2);
-      expect(stdout).toBe("");
-      expect(stderr).toContain('Format "html" is not implemented yet.');
-      expect(stderr).toContain("Currently supported: text, json, sarif.");
+      expect(exitCode).toBe(1);
+      expect(stderr).toBe("");
+      expect(stdout.startsWith("<!doctype html>")).toBe(true);
+      expect(stdout.trim().endsWith("</html>")).toBe(true);
+      expect(stdout).toContain("Independent awaits run sequentially.");
+      expect(stdout).toContain(`async-doctor v${VERSION} report`);
     });
 
+    it("0건이어도 exit 0과 빈 상태 문서를 낸다", () => {
+      const { exitCode, stdout } = invoke([CLEAN, "--format=html"]);
+
+      expect(exitCode).toBe(0);
+      expect(stdout.startsWith("<!doctype html>")).toBe(true);
+      expect(stdout).toContain("No async bottlenecks found.");
+    });
+
+    it("--verbose일 때만 code 스니펫을 <pre><code>로 포함한다", () => {
+      const plain = invoke([BOTTLENECK, "--format", "html"]).stdout;
+      const verbose = invoke([BOTTLENECK, "--format", "html", "--verbose"]).stdout;
+
+      expect(plain).not.toContain('<pre class="finding-code">');
+      expect(verbose).toContain('<pre class="finding-code">');
+      expect(verbose).toContain("await processItem(order);");
+    });
+
+    it("--verbose를 붙여도 stdout은 여전히 HTML 문서다 (진행 로그는 stderr)", () => {
+      const { exitCode, stdout, stderr } = invoke([BOTTLENECK, "--format", "html", "--verbose"]);
+
+      expect(exitCode).toBe(1);
+      expect(stdout.startsWith("<!doctype html>")).toBe(true);
+      expect(stdout).not.toContain("Analyzing");
+      expect(stderr).toContain("Analyzing 1 file(s)...");
+    });
+  });
+
+  describe("--format 검증", () => {
     it("KNOWN_FORMATS에 없는 값은 파싱 단계에서 exit 2로 막힌다", () => {
       const { exitCode, stdout, stderr } = invoke([BOTTLENECK, "--format", "xml"]);
 
@@ -312,6 +342,7 @@ describe("CLI — run() 통합", () => {
       expect(short.stdout).toBe(long.stdout);
       expect(short.stdout).toContain("Usage:");
       expect(short.stdout).toContain("--format <format>");
+      expect(short.stdout).toContain("text (default), json, sarif, html");
       expect(short.stderr).toBe("");
     });
 

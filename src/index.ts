@@ -34,6 +34,7 @@ export {
   toSarifLevel,
 } from "./reporter/sarif-reporter.js";
 export type { SarifLog, SarifResult, SarifLevel } from "./reporter/sarif-reporter.js";
+export { HtmlReporter, htmlReporter, escapeHtml } from "./reporter/html-reporter.js";
 export { relativePath, toPosixPath, countBySeverity } from "./reporter/shared.js";
 
 export { VERSION, HOMEPAGE } from "./core/package-info.js";

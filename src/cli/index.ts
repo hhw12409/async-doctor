@@ -11,6 +11,7 @@ import { collectFiles } from "../analyzer/file-discovery.js";
 import { VERSION } from "../core/package-info.js";
 import { isSeverity } from "../core/severity.js";
 import { consoleReporter } from "../reporter/console-reporter.js";
+import { htmlReporter } from "../reporter/html-reporter.js";
 import { jsonReporter } from "../reporter/json-reporter.js";
 import { sarifReporter } from "../reporter/sarif-reporter.js";
 import type { Reporter, ReportFormat } from "../reporter/types.js";
@@ -19,12 +20,13 @@ import type { Severity } from "../core/types.js";
 /**
  * --format 값 → Reporter 구현체 레지스트리.
  * 새 형식 추가는 Reporter를 구현하는 파일 하나 + 이 맵에 한 줄 등록으로 끝난다.
- * 미등록 형식(html)은 아래 run()에서 데이터 기반 "not implemented" 에러로 처리된다.
+ * 미등록 형식이 있다면 아래 run()에서 데이터 기반 "not implemented" 에러로 처리된다.
  */
 const REPORTERS: Partial<Record<ReportFormat, Reporter>> = {
   text: consoleReporter,
   json: jsonReporter,
   sarif: sarifReporter,
+  html: htmlReporter,
 };
 
 const KNOWN_FORMATS: ReportFormat[] = ["text", "json", "sarif", "html"];
@@ -51,7 +53,7 @@ Arguments:
 
 Options:
   --verbose              Include the offending code snippet in the output
-  --format <format>      Output format: text (default), json, sarif. html is not implemented yet
+  --format <format>      Output format: text (default), json, sarif, html
   --severity <level>     Only report findings at or above this level: error | warning | info
   -h, --help             Show this help
   -v, --version          Show version
@@ -61,7 +63,8 @@ Examples:
   async-doctor src/user.service.ts --verbose
   async-doctor src --severity warning --format text
   async-doctor src --format json
-  async-doctor src --format sarif > async-doctor.sarif`;
+  async-doctor src --format sarif > async-doctor.sarif
+  async-doctor src --format html > report.html`;
 
 function readValue(argv: string[], index: number, flag: string): string {
   const inlineIndex = argv[index].indexOf("=");

@@ -27,8 +27,7 @@ async-doctor <path> [--verbose] [--format text] [--severity warning]
 - `<path>` — a single file or a directory (recursively scanned). Supported extensions:
   `.ts .tsx .js .jsx .mts .cts`.
 - `--verbose` — also print the offending code snippet.
-- `--format <format>` — output format. `text` (default), `json` and `sarif` are implemented;
-  `html` is reserved and reported as not implemented.
+- `--format <format>` — output format: `text` (default), `json`, `sarif`, or `html`.
 - `--severity <level>` — only report findings at or above `error` > `warning` > `info`.
 
 `--format json` always prints a valid JSON document (even with zero findings) shaped as
@@ -78,6 +77,7 @@ src/
     console-reporter.ts    text output
     json-reporter.ts       machine-readable JSON output
     sarif-reporter.ts      SARIF 2.1.0 output (GitHub Code Scanning)
+    html-reporter.ts       self-contained single-file HTML output
   core/
     types.ts               Severity, Finding, AnalysisContext, AsyncDoctorRule
     severity.ts            severity ranking + threshold filtering
