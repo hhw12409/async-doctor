@@ -14,6 +14,8 @@ export { meetsThreshold, compareSeverity, isSeverity, SEVERITIES } from "./core/
 export { analyze, sortFindings } from "./analyzer/analyzer.js";
 export type { AnalyzeOptions } from "./analyzer/analyzer.js";
 export { createContext } from "./analyzer/context.js";
+export { collectSuppressions, isSuppressed } from "./analyzer/suppressions.js";
+export type { Suppression } from "./analyzer/suppressions.js";
 export {
   collectFiles,
   isSupportedFile,

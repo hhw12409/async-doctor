@@ -1,6 +1,7 @@
 import { Project, ts } from "ts-morph";
 import { rules as defaultRules } from "../rules/index.js";
 import { createContext } from "./context.js";
+import { collectSuppressions, isSuppressed } from "./suppressions.js";
 import { compareSeverity, meetsThreshold } from "../core/severity.js";
 import type { AsyncDoctorRule, Finding, Severity } from "../core/types.js";
 
@@ -40,15 +41,21 @@ export function analyze(filePaths: string[], options: AnalyzeOptions = {}): Find
   for (const filePath of filePaths) {
     const sourceFile = project.getSourceFile(filePath) ?? project.addSourceFileAtPath(filePath);
     const context = createContext(sourceFile, filePath);
+    const fileFindings: Finding[] = [];
 
     for (const rule of rules) {
       try {
-        findings.push(...rule.analyze(context));
+        fileFindings.push(...rule.analyze(context));
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Rule "${rule.name}" failed on ${filePath}: ${message}`);
       }
     }
+
+    // 인라인 억제 코멘트(// async-doctor-disable-next-line 등)로 걸러낸 뒤에만
+    // 전역 findings에 반영한다. rule 실행 자체와는 무관한 별도 관심사다.
+    const suppressions = collectSuppressions(sourceFile);
+    findings.push(...fileFindings.filter((finding) => !isSuppressed(finding, suppressions)));
   }
 
   const threshold = options.severityThreshold;

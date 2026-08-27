@@ -34,6 +34,7 @@ const [user, posts] = await Promise.all([getUser(id), getPosts(id)]);
 - [Install](#install)
 - [Usage](#usage)
 - [Rules](#rules)
+- [Suppressing Findings](#suppressing-findings)
 - [Output Formats](#output-formats)
 - [Programmatic API](#programmatic-api)
 - [Architecture](#architecture)
@@ -84,6 +85,26 @@ Exit codes: `0` no findings, `1` findings reported, `2` usage or runtime error.
 Static analysis can't see runtime side effects, so every finding is a `warning`: fix the ones that
 apply, and keep the sequential form where the calls genuinely share state.
 
+## Suppressing Findings
+
+Static analysis can't see runtime intent, so when a finding is a deliberate, known-safe exception,
+suppress it inline instead of turning the whole rule off:
+
+```ts
+// async-doctor-disable-next-line sequential-await
+const user = await getUser(id); // getUser warms a cache that getPosts relies on
+const posts = await getPosts(id);
+```
+
+- `// async-doctor-disable-next-line` — suppress every rule on the next line.
+- `// async-doctor-disable-next-line rule-a, rule-b` — suppress only the listed rules.
+- `// async-doctor-disable-line` — suppress every rule on the same line (as a trailing comment).
+- `// async-doctor-disable-line rule-a` — suppress only the listed rule on the same line.
+- `/* ... */` block comments work the same way.
+
+Suppression comments are always on — there's no flag to disable them. A misspelled rule name
+suppresses nothing (no error); double-check the name against the [Rules](#rules) table above.
+
 ## Output Formats
 
 | Format  | Use case                                                                                                 | Path style           |
@@ -115,6 +136,7 @@ src/
     analyzer.ts            runs every registered rule over the parsed files
     context.ts             builds the AnalysisContext handed to each rule
     file-discovery.ts      path -> file list, SUPPORTED_EXTENSIONS
+    suppressions.ts        inline disable-comment parsing (rule-agnostic)
   rules/index.ts           rule registry (the extension point)
   reporter/
     types.ts               Reporter interface
