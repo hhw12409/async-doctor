@@ -101,7 +101,10 @@ describe("html-reporter", () => {
 
     it("info는 개수와 무관하게 단/복수 변화 없이 항상 'info'로 표기한다", () => {
       const one = renderSummary([makeFinding({ severity: "info" })]);
-      const two = renderSummary([makeFinding({ severity: "info" }), makeFinding({ severity: "info" })]);
+      const two = renderSummary([
+        makeFinding({ severity: "info" }),
+        makeFinding({ severity: "info" }),
+      ]);
 
       expect(one).toContain("1 info<");
       expect(two).toContain("2 info<");
