@@ -59,6 +59,17 @@ describe("no-await-in-loop", () => {
       expect(finding.code).toContain("for (const item of items)");
       expect(finding.reason).toBeTruthy();
     });
+
+    it("(d) do-while 본문의 await를 탐지한다", () => {
+      const findings = analyzeFixture("positive-do-while");
+
+      expect(findings).toHaveLength(1);
+      expect(findings[0].rule).toBe("no-await-in-loop");
+      expect(findings[0].severity).toBe("warning");
+      expect(findings[0].line).toBe(7);
+      expect(findings[0].column).toBe(5);
+      expect(findings[0].code).toContain("do {");
+    });
   });
 
   describe("negative — 탐지되면 안 되는 패턴", () => {
@@ -72,6 +83,10 @@ describe("no-await-in-loop", () => {
 
     it("루프 헤더(iterable 표현식)의 await는 탐지하지 않는다", () => {
       expect(analyzeFixture("negative-loop-header-await")).toEqual([]);
+    });
+
+    it("(d) do-while의 조건식 await는 본문이 아니므로 탐지하지 않는다", () => {
+      expect(analyzeFixture("negative-do-while-condition")).toEqual([]);
     });
   });
 });

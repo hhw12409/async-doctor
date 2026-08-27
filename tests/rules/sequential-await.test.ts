@@ -52,6 +52,54 @@ describe("sequential-await", () => {
       expect(two.code).toContain("const user = await getUser();");
       expect(two.code).toContain("const inventory = await getInventory();");
     });
+
+    it("(a) 한 문장 안의 여러 선언자(const a = await f(), b = await g();)를 탐지한다", () => {
+      const findings = analyzeFixture("positive-multi-declarator");
+
+      expect(findings).toHaveLength(1);
+      expect(findings[0].rule).toBe("sequential-await");
+      expect(findings[0].severity).toBe("warning");
+      expect(findings[0].line).toBe(6);
+      expect(findings[0].column).toBe(3);
+      expect(findings[0].suggestion?.[0]).toBe("const [a, b] = await Promise.all([f(), g()]);");
+      // 형제 선언자가 statement 노드를 공유해도 code는 한 번만 담긴다(중복 제거)
+      expect(findings[0].code).toBe("const a = await f(),\n    b = await g();");
+    });
+
+    it("(b) 선언 없는 표현식문(await f(); await g();)을 탐지한다", () => {
+      const findings = analyzeFixture("positive-bare-awaits");
+
+      expect(findings).toHaveLength(1);
+      expect(findings[0].rule).toBe("sequential-await");
+      expect(findings[0].severity).toBe("warning");
+      expect(findings[0].line).toBe(5);
+      expect(findings[0].column).toBe(3);
+      expect(findings[0].suggestion?.[0]).toBe("await Promise.all([f(), g()]);");
+    });
+
+    it("(b) 선언 있는 await와 선언 없는 await가 섞인 그룹도 탐지하고, 구조 분해 구멍을 제안한다", () => {
+      const findings = analyzeFixture("positive-mixed-bare-and-declared");
+
+      expect(findings).toHaveLength(1);
+      expect(findings[0].rule).toBe("sequential-await");
+      expect(findings[0].severity).toBe("warning");
+      expect(findings[0].line).toBe(6);
+      expect(findings[0].column).toBe(3);
+      expect(findings[0].suggestion?.[0]).toBe("const [a, ] = await Promise.all([f(), g()]);");
+    });
+
+    it("(c) 프로퍼티명이 앞 변수명과 우연히 같아도(data.user) 독립 await로 탐지한다", () => {
+      const findings = analyzeFixture("positive-property-collision");
+
+      expect(findings).toHaveLength(1);
+      expect(findings[0].rule).toBe("sequential-await");
+      expect(findings[0].severity).toBe("warning");
+      expect(findings[0].line).toBe(7);
+      expect(findings[0].column).toBe(3);
+      expect(findings[0].suggestion?.[0]).toBe(
+        "const [user, orders] = await Promise.all([getUser(), getOrders(data.user)]);",
+      );
+    });
   });
 
   describe("negative — 탐지되면 안 되는 패턴", () => {
@@ -69,6 +117,14 @@ describe("sequential-await", () => {
 
     it("이미 Promise.all로 병렬화된 코드는 탐지하지 않는다", () => {
       expect(analyzeFixture("negative-already-parallel")).toEqual([]);
+    });
+
+    it("(a) 같은 문장 안에서 뒤 선언자가 앞 선언자에 의존하면 탐지하지 않는다", () => {
+      expect(analyzeFixture("negative-multi-declarator-dependent")).toEqual([]);
+    });
+
+    it("(c) 섀도잉된 변수에 진짜로 의존하는 경우(user.id)는 여전히 탐지하지 않는다 — 회귀 확인", () => {
+      expect(analyzeFixture("negative-shadowed-real-dependency")).toEqual([]);
     });
   });
 });

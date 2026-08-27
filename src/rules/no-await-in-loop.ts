@@ -20,13 +20,14 @@ function isFunctionBoundary(node: Node): boolean {
   );
 }
 
-/** 대상 루프(for / for-of / for-in / while)면 본문 statement를, 아니면 undefined를 반환한다 */
+/** 대상 루프(for / for-of / for-in / while / do-while)면 본문 statement를, 아니면 undefined를 반환한다 */
 function getLoopBody(node: Node): Node | undefined {
   if (
     Node.isForStatement(node) ||
     Node.isForOfStatement(node) ||
     Node.isForInStatement(node) ||
-    Node.isWhileStatement(node)
+    Node.isWhileStatement(node) ||
+    Node.isDoStatement(node)
   ) {
     return node.getStatement();
   }
