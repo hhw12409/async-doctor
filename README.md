@@ -76,11 +76,12 @@ Exit codes: `0` no findings, `1` findings reported, `2` usage or runtime error.
 
 ## Rules
 
-| Rule                                                | Detects                                                                                                                                                | Severity  |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
-| [`sequential-await`](src/rules/sequential-await.ts) | Consecutive `await`s that don't depend on each other's results and could run in parallel via `Promise.all`.                                            | `warning` |
-| [`no-await-in-loop`](src/rules/no-await-in-loop.ts) | `await` expressions executed one iteration at a time inside a loop instead of batched.                                                                 | `warning` |
-| [`no-foreach-async`](src/rules/no-foreach-async.ts) | `array.forEach(async (item) => { await ... })` — `forEach` never awaits the callback's promise, so errors are swallowed and ordering isn't guaranteed. | `warning` |
+| Rule                                                | Detects                                                                                                                                                                          | Severity  |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| [`sequential-await`](src/rules/sequential-await.ts) | Consecutive `await`s that don't depend on each other's results and could run in parallel via `Promise.all`.                                                                      | `warning` |
+| [`no-await-in-loop`](src/rules/no-await-in-loop.ts) | `await` expressions executed one iteration at a time inside a loop instead of batched.                                                                                           | `warning` |
+| [`no-foreach-async`](src/rules/no-foreach-async.ts) | `array.forEach(async (item) => { await ... })` — `forEach` never awaits the callback's promise, so errors are swallowed and ordering isn't guaranteed.                           | `warning` |
+| [`no-async-reduce`](src/rules/no-async-reduce.ts)   | `array.reduce(async (acc, item) => { await ... })` — an async reducer awaits the previous iteration's accumulator promise, forcing every item to run strictly one after another. | `warning` |
 
 Static analysis can't see runtime side effects, so every finding is a `warning`: fix the ones that
 apply, and keep the sequential form where the calls genuinely share state.
