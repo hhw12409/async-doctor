@@ -3,6 +3,7 @@ import { noAwaitInLoopRule } from "./no-await-in-loop.js";
 import { sequentialAwaitRule } from "./sequential-await.js";
 import { noForEachAsyncRule } from "./no-foreach-async.js";
 import { noAsyncReduceRule } from "./no-async-reduce.js";
+import { noFloatingPromiseRule } from "./no-floating-promise.js";
 
 /**
  * rule 레지스트리 — 이 프로젝트의 확장점.
@@ -14,9 +15,11 @@ export const rules: AsyncDoctorRule[] = [
   sequentialAwaitRule,
   noForEachAsyncRule,
   noAsyncReduceRule,
+  noFloatingPromiseRule,
 ];
 
 export { noAwaitInLoopRule } from "./no-await-in-loop.js";
 export { sequentialAwaitRule } from "./sequential-await.js";
 export { noForEachAsyncRule } from "./no-foreach-async.js";
 export { noAsyncReduceRule } from "./no-async-reduce.js";
+export { noFloatingPromiseRule } from "./no-floating-promise.js";
