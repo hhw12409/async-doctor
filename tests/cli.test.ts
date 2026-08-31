@@ -103,13 +103,17 @@ describe("CLI — --severity 필터링", () => {
 
 describe("CLI — 인자 파싱", () => {
   it("경로와 기본값을 파싱한다", () => {
-    expect(parseArgs(["src"])).toEqual({
+    // format은 --format을 실제로 지정했을 때만 채워진다(undefined가 기본) — run()이 설정
+    // 파일과 병합한 뒤에만 "text" 기본값을 채우므로, 여기서는 키가 아예 없어야 한다.
+    const options = parseArgs(["src"]);
+
+    expect(options).toEqual({
       path: "src",
       verbose: false,
-      format: "text",
       help: false,
       version: false,
     });
+    expect(options.format).toBeUndefined();
   });
 
   it("--severity를 공백 구분과 = 구분 양쪽으로 받는다", () => {

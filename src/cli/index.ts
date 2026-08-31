@@ -7,15 +7,18 @@
  * import해도 CLI가 실행되지 않는다.
  */
 import { analyze } from "../analyzer/analyzer.js";
-import { collectFiles } from "../analyzer/file-discovery.js";
+import { collectFiles, filterIgnored } from "../analyzer/file-discovery.js";
+import { loadConfig } from "../core/config.js";
 import { VERSION } from "../core/package-info.js";
 import { isSeverity } from "../core/severity.js";
+import { rules as ruleRegistry } from "../rules/index.js";
 import { consoleReporter } from "../reporter/console-reporter.js";
 import { htmlReporter } from "../reporter/html-reporter.js";
 import { jsonReporter } from "../reporter/json-reporter.js";
 import { sarifReporter } from "../reporter/sarif-reporter.js";
+import { REPORT_FORMATS } from "../reporter/types.js";
 import type { Reporter, ReportFormat } from "../reporter/types.js";
-import type { Severity } from "../core/types.js";
+import type { AsyncDoctorRule, Severity } from "../core/types.js";
 
 /**
  * --format 값 → Reporter 구현체 레지스트리.
@@ -29,12 +32,18 @@ const REPORTERS: Partial<Record<ReportFormat, Reporter>> = {
   html: htmlReporter,
 };
 
-const KNOWN_FORMATS: ReportFormat[] = ["text", "json", "sarif", "html"];
+const KNOWN_FORMATS = REPORT_FORMATS;
 
 export interface CliOptions {
   path: string;
   verbose: boolean;
-  format: ReportFormat;
+  /**
+   * --format 플래그로 명시한 값. **미지정 시 `undefined`** — 여기서 곧바로 `"text"`를
+   * 채우면 "플래그를 실제로 지정했는지"와 "기본값이 채워진 것인지"를 구분할 수 없어져
+   * 설정 파일보다 항상 CLI 플래그가 우선한다는 규칙을 구현할 수 없다. 최종 기본값은
+   * `run()`이 설정 파일과 병합한 뒤에만 채운다.
+   */
+  format?: ReportFormat;
   severity?: Severity;
   help: boolean;
   version: boolean;
@@ -57,6 +66,11 @@ Options:
   --severity <level>     Only report findings at or above this level: error | warning | info
   -h, --help             Show this help
   -v, --version          Show version
+
+Config:
+  A .async-doctorrc.json in the current directory can set defaults for --format/--severity
+  and configure "ignore" globs or per-rule overrides. CLI flags always win.
+  See the README's "Config File" section for the schema.
 
 Examples:
   async-doctor src
@@ -86,7 +100,6 @@ export function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     path: "",
     verbose: false,
-    format: "text",
     help: false,
     version: false,
   };
@@ -177,10 +190,26 @@ export function run(argv: string[]): number {
     return 2;
   }
 
-  const reporter = REPORTERS[options.format];
+  // 설정 파일은 cwd에서만 찾는다(상위 walk-up 없음). 파일이 없으면 undefined —
+  // 이 시점부터는 기존 동작(CLI 플래그만)과 100% 동일하게 흘러간다.
+  // 파일이 있는데 파싱/스키마 오류면 조용히 무시하지 않고 즉시 exit 2로 종료한다.
+  let config;
+  try {
+    config = loadConfig(process.cwd());
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    return 2;
+  }
+
+  // 우선순위: CLI 플래그 > 설정 파일 > 내장 기본값("text", threshold 없음).
+  // options.format/severity가 undefined일 때만 설정 파일 값을 내려받는다.
+  const format: ReportFormat = options.format ?? config?.format ?? "text";
+  const severity: Severity | undefined = options.severity ?? config?.severity;
+
+  const reporter = REPORTERS[format];
   if (!reporter) {
     process.stderr.write(
-      `Format "${options.format}" is not implemented yet. Currently supported: ${Object.keys(REPORTERS).join(", ")}.\n`,
+      `Format "${format}" is not implemented yet. Currently supported: ${Object.keys(REPORTERS).join(", ")}.\n`,
     );
     return 2;
   }
@@ -191,6 +220,10 @@ export function run(argv: string[]): number {
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     return 2;
+  }
+
+  if (config?.ignore && config.ignore.length > 0) {
+    files = filterIgnored(files, config.ignore, process.cwd());
   }
 
   if (files.length === 0) {
@@ -205,9 +238,35 @@ export function run(argv: string[]): number {
     process.stderr.write(`Analyzing ${files.length} file(s)...\n\n`);
   }
 
+  // config.rules는 "off"(비활성화)와 severity 오버라이드를 함께 담는다.
+  // "off"는 analyzer.ts의 기존 확장점(AnalyzeOptions.rules)에 걸러낸 배열을 주입해 처리하고,
+  // severity 오버라이드는 rule이 Finding.severity를 스스로 하드코딩해 push하므로 rule 레벨에서
+  // 처리할 수 없어 analyzer 파이프라인의 severityOverrides로 넘긴다. 둘 다 analyzer.ts 자체는
+  // 수정하지 않는다 — rule 이름 오타는(레지스트리에 없는 키) 아무 rule에도 매치되지 않으므로
+  // 조용히 무시된다(에러 아님), 억제 코멘트와 동일한 정책.
+  const ruleOverrides = config?.rules ?? {};
+  const disabledRuleNames = new Set(
+    Object.entries(ruleOverrides)
+      .filter(([, value]) => value === "off")
+      .map(([name]) => name),
+  );
+  const activeRules: AsyncDoctorRule[] =
+    disabledRuleNames.size > 0
+      ? ruleRegistry.filter((rule) => !disabledRuleNames.has(rule.name))
+      : ruleRegistry;
+
+  const severityOverrides: Partial<Record<string, Severity>> = {};
+  for (const [name, value] of Object.entries(ruleOverrides)) {
+    if (value !== "off") severityOverrides[name] = value;
+  }
+
   let findings;
   try {
-    findings = analyze(files, { severityThreshold: options.severity });
+    findings = analyze(files, {
+      severityThreshold: severity,
+      rules: activeRules,
+      severityOverrides,
+    });
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     return 2;

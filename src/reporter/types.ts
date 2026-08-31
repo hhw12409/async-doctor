@@ -3,6 +3,12 @@ import type { Finding } from "../core/types.js";
 /** 지원(또는 향후 지원 예정)하는 출력 형식 */
 export type ReportFormat = "text" | "json" | "sarif" | "html";
 
+/**
+ * ReportFormat의 런타임 목록 — CLI `--format` 검증과 설정 파일(`format` 필드) 검증이
+ * 이 배열 하나만 공유한다. 새 형식을 추가할 때 여기 한 줄만 늘리면 양쪽 다 반영된다.
+ */
+export const REPORT_FORMATS: ReportFormat[] = ["text", "json", "sarif", "html"];
+
 export interface ReportOptions {
   /** Finding.code 스니펫까지 출력할지 여부 */
   verbose?: boolean;

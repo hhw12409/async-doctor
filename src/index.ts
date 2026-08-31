@@ -10,6 +10,8 @@
  */
 export type { Severity, Finding, AnalysisContext, AsyncDoctorRule } from "./core/types.js";
 export { meetsThreshold, compareSeverity, isSeverity, SEVERITIES } from "./core/severity.js";
+export { loadConfig, ConfigError, CONFIG_FILE_NAME } from "./core/config.js";
+export type { AsyncDoctorConfig } from "./core/config.js";
 
 export { analyze, sortFindings } from "./analyzer/analyzer.js";
 export type { AnalyzeOptions } from "./analyzer/analyzer.js";
@@ -18,6 +20,7 @@ export { collectSuppressions, isSuppressed } from "./analyzer/suppressions.js";
 export type { Suppression } from "./analyzer/suppressions.js";
 export {
   collectFiles,
+  filterIgnored,
   isSupportedFile,
   SUPPORTED_EXTENSIONS,
   IGNORED_DIRECTORIES,
@@ -26,6 +29,7 @@ export {
 export { rules } from "./rules/index.js";
 
 export type { Reporter, ReportOptions, ReportFormat } from "./reporter/types.js";
+export { REPORT_FORMATS } from "./reporter/types.js";
 export { ConsoleReporter, consoleReporter } from "./reporter/console-reporter.js";
 export { JsonReporter, jsonReporter, buildJsonReport } from "./reporter/json-reporter.js";
 export type { JsonReport, JsonReportSummary } from "./reporter/json-reporter.js";

@@ -10,9 +10,18 @@ export interface AnalyzeOptions {
   severityThreshold?: Severity;
   /**
    * 실행할 rule 목록. 기본값은 src/rules/index.ts의 레지스트리.
-   * 테스트에서 특정 rule만 실행할 때 주입한다.
+   * 테스트에서 특정 rule만 실행할 때, 또는 CLI가 설정 파일의 `rules.<name>: "off"`를
+   * 걸러낸 배열을 주입할 때 사용한다.
    */
   rules?: AsyncDoctorRule[];
+  /**
+   * rule 이름 → 이 rule이 만드는 모든 Finding의 severity를 덮어쓸 값.
+   * 각 rule은 `Finding.severity`를 자체 로직으로 하드코딩해 push하므로(rule.severity를
+   * 참조하는 간접 구조가 아니다), severity 오버라이드는 rule 레벨이 아니라 여기서 처리한다.
+   * 억제 코멘트 필터링보다 먼저, `severityThreshold` 필터링보다 먼저 적용된다 — 오버라이드로
+   * 심각도가 바뀐 뒤의 값을 기준으로 억제/threshold 판단이 이뤄져야 하기 때문이다.
+   */
+  severityOverrides?: Partial<Record<string, Severity>>;
 }
 
 function createProject(): Project {
@@ -45,7 +54,12 @@ export function analyze(filePaths: string[], options: AnalyzeOptions = {}): Find
 
     for (const rule of rules) {
       try {
-        fileFindings.push(...rule.analyze(context));
+        const ruleFindings = rule.analyze(context);
+        const override = options.severityOverrides?.[rule.name];
+        if (override) {
+          for (const finding of ruleFindings) finding.severity = override;
+        }
+        fileFindings.push(...ruleFindings);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Rule "${rule.name}" failed on ${filePath}: ${message}`);

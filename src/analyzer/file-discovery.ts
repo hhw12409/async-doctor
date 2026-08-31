@@ -81,3 +81,63 @@ export function collectFiles(targetPath: string): string[] {
 
   return [...new Set(collected)].sort();
 }
+
+/**
+ * `.async-doctorrc.json`의 `ignore` glob 패턴을 매칭하는 최소 구현.
+ * 완전한 glob 스펙(`?`, `{a,b}`, `[abc]` 등)은 지원하지 않는다 — 새 npm 의존성을 추가하지
+ * 않기 위한 의도적 축소, 이 프로젝트의 기존 dependencies는 ts-morph 하나뿐이라는 관례를 유지.
+ *
+ * 지원 문법:
+ * - `*`  세그먼트 내부의 임의 문자열 (경로 구분자 `/`는 넘지 않는다)
+ * - `**` 임의 깊이의 경로 세그먼트, 0단계 포함 (`**\/`는 그 뒤 슬래시까지 함께 삼킨다)
+ * - 그 외 문자는 리터럴로 매칭
+ */
+const GLOB_ESCAPE = /[.+^${}()|[\]\\]/g;
+
+function globToRegExp(pattern: string): RegExp {
+  let out = "";
+  let i = 0;
+  while (i < pattern.length) {
+    const char = pattern[i];
+
+    if (char === "*" && pattern[i + 1] === "*") {
+      if (pattern[i + 2] === "/") {
+        out += "(?:.*/)?";
+        i += 3;
+      } else {
+        out += ".*";
+        i += 2;
+      }
+      continue;
+    }
+
+    if (char === "*") {
+      out += "[^/]*";
+      i += 1;
+      continue;
+    }
+
+    out += char.replace(GLOB_ESCAPE, "\\$&");
+    i += 1;
+  }
+  return new RegExp(`^${out}$`);
+}
+
+/** 절대 경로를 `cwd` 기준 POSIX 상대경로로 바꾼다 — ignore 패턴은 항상 `/`를 구분자로 쓴다 */
+function toRelativePosix(filePath: string, cwd: string): string {
+  return path.relative(cwd, filePath).split(path.sep).join("/");
+}
+
+/**
+ * `collectFiles()`가 반환한 파일 목록에서 `patterns` 중 하나라도 매칭되는 파일을 제외한다.
+ * 패턴은 `cwd` 기준 상대경로에 대해 매칭된다.
+ */
+export function filterIgnored(files: string[], patterns: string[], cwd: string): string[] {
+  if (patterns.length === 0) return files;
+
+  const regexes = patterns.map(globToRegExp);
+  return files.filter((file) => {
+    const rel = toRelativePosix(file, cwd);
+    return !regexes.some((regex) => regex.test(rel));
+  });
+}

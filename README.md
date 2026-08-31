@@ -33,6 +33,7 @@ const [user, posts] = await Promise.all([getUser(id), getPosts(id)]);
 
 - [Install](#install)
 - [Usage](#usage)
+- [Config File](#config-file)
 - [Rules](#rules)
 - [Suppressing Findings](#suppressing-findings)
 - [Output Formats](#output-formats)
@@ -73,6 +74,42 @@ async-doctor src --format html > report.html
 ```
 
 Exit codes: `0` no findings, `1` findings reported, `2` usage or runtime error.
+
+## Config File
+
+Drop a `.async-doctorrc.json` in the directory you run `async-doctor` from (checked in
+`process.cwd()` only — no walking up to parent directories) to set project-wide defaults instead
+of repeating CLI flags every time:
+
+```json
+{
+  "ignore": ["**/*.generated.ts", "vendor/**"],
+  "rules": {
+    "no-await-in-loop": "off",
+    "sequential-await": "error"
+  },
+  "format": "json",
+  "severity": "warning"
+}
+```
+
+- `ignore` — glob patterns matched against each file's path relative to the config file's
+  directory. Supports `*` (any characters within one path segment), `**` (any number of segments,
+  including zero), and literal segments — not a full glob implementation (no `?`, `{a,b}`,
+  `[abc]`), by design, to avoid adding a dependency beyond `ts-morph`.
+- `rules` — map a rule name to `"off"` to disable it, or to a `Severity` (`"error"` | `"warning"` |
+  `"info"`) to override the severity of every finding that rule produces. Unrecognized rule names
+  (typos, removed/renamed rules) are silently ignored — same policy as
+  [suppression comments](#suppressing-findings).
+- `format` / `severity` — defaults used when the matching CLI flag isn't passed.
+
+**Priority: CLI flag > config file > built-in default** (`format: "text"`, no severity threshold).
+`--format json` on the command line always wins over `"format": "html"` in the config file.
+
+A missing config file is not an error — behavior is identical to not having one. A config file
+that exists but fails to parse as JSON, or violates the schema above (e.g. `"rules": { "x": "nope"
+}`), fails the run with a clear error message and exit code `2` — it's a file you wrote, so
+silently ignoring mistakes in it would be more confusing than failing loudly.
 
 ## Rules
 
@@ -137,11 +174,11 @@ src/
   analyzer/
     analyzer.ts            runs every registered rule over the parsed files
     context.ts             builds the AnalysisContext handed to each rule
-    file-discovery.ts      path -> file list, SUPPORTED_EXTENSIONS
+    file-discovery.ts      path -> file list, SUPPORTED_EXTENSIONS, filterIgnored() (ignore globs)
     suppressions.ts        inline disable-comment parsing (rule-agnostic)
   rules/index.ts           rule registry (the extension point)
   reporter/
-    types.ts               Reporter interface
+    types.ts               Reporter interface, ReportFormat, REPORT_FORMATS
     shared.ts              path/counting helpers shared by every reporter
     console-reporter.ts    text output
     json-reporter.ts       machine-readable JSON output
@@ -150,9 +187,14 @@ src/
   core/
     types.ts               Severity, Finding, AnalysisContext, AsyncDoctorRule
     severity.ts            severity ranking + threshold filtering
+    config.ts              .async-doctorrc.json loading + schema validation
     package-info.ts        VERSION / HOMEPAGE derived from package.json
   index.ts                 programmatic entrypoint
 ```
+
+`core/` has no outward dependencies except `config.ts`, which imports `ReportFormat`/
+`REPORT_FORMATS` from `reporter/types.ts` to validate the config file's `format` field against the
+same list the CLI uses — a deliberate, narrow exception rather than an oversight.
 
 ### Adding a rule
 
