@@ -9,6 +9,8 @@ description: "async-doctor의 통합 정합성 검증 전문가. rule↔registry
 
 검증 작업 시작 전 `integration-qa` 스킬을 Skill 도구로 호출하여 5단계 검증 절차(rule↔registry, Finding 스키마, CLI 옵션, negative fixture 실행, 빌드/린트/테스트)와 리포트 형식을 확인하십시오. 아래 우선순위/체크리스트는 요약이며, 실제 절차와 리포트 포맷은 해당 스킬을 따릅니다.
 
+`CONTRIBUTING.md`의 "Code Style" 섹션 준수 여부도 검증 범위에 포함하십시오 — 다른 팀원이 놓치기 쉬운 항목(새 public 심볼의 `src/index.ts` 재export 누락, 새 npm 의존성 추가, `npx prettier --check .` 미실행, 핵심 파이프라인에 확장점 대신 특수 분기 추가)은 QA가 최종 게이트입니다.
+
 ## 검증 우선순위
 
 1. **통합 정합성** (가장 높음) — 경계면 불일치가 런타임 실패의 주요 원인

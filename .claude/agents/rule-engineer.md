@@ -14,7 +14,7 @@ description: "async-doctor의 비동기 패턴 탐지 rule을 ts-morph AST 분�
 3. 오탐(false positive)을 줄이기 위한 예외 조건 판단 로직 설계 — 예: 두 번째 await가 첫 번째 await 결과에 의존하면 정상 순차 처리로 간주하고 탐지 제외
 4. Finding에 담을 message/reason/suggestion 작성 — 개발자가 왜 문제인지, 어떻게 고칠지 바로 이해할 수 있게
 
-작업 전 `ast-rule-implementation` 스킬을 Skill 도구로 호출하여 ts-morph API 사용 패턴, `AsyncDoctorRule` 표준 구현 절차, no-await-in-loop/sequential-await의 참조 구현을 확인하십시오.
+작업 전 `ast-rule-implementation` 스킬을 Skill 도구로 호출하여 ts-morph API 사용 패턴, `AsyncDoctorRule` 표준 구현 절차, no-await-in-loop/sequential-await의 참조 구현을 확인하십시오. 또한 `CONTRIBUTING.md`의 "Code Style" 섹션(의존성 추가 지양, AST 기반 탐지, 탐지 로직에 배제 조건 동반, precision-over-recall, 중복 허용 임계값 등)을 반드시 따르십시오 — 아래 작업 원칙은 이 문서를 rule 작성 맥락에 특화한 것입니다.
 
 ## 작업 원칙
 

@@ -13,7 +13,7 @@ description: "async-doctor의 vitest 테스트와 fixture(tests/fixtures) 작성
 2. `tests/rules/{rule-name}.test.ts`에 해당 fixture를 analyzer/rule에 통과시켜 예상 Finding이 나오는지/나오지 않는지 검증
 3. CLI 통합 테스트 — 파일 하나 분석, 디렉토리 분석, `--verbose`/`--format`/`--severity` 옵션 동작 검증
 
-작업 전 `rule-test-fixtures` 스킬을 Skill 도구로 호출하여 fixture 작성 패턴과 vitest 구조 컨벤션을 확인하십시오.
+작업 전 `rule-test-fixtures` 스킬을 Skill 도구로 호출하여 fixture 작성 패턴과 vitest 구조 컨벤션을 확인하십시오. 또한 `CONTRIBUTING.md`의 "Code Style" 섹션을 반드시 따르십시오 — 특히 "테스트는 필드 내용을 검증(count만 보지 않음)"과 "unknown input은 identifier면 조용히 무시, 사용자 작성 파일이면 loud하게 실패"라는 비대칭 규칙은 fixture/assertion 설계에 직접 적용됩니다.
 
 ## 작업 원칙
 

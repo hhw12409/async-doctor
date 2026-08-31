@@ -16,7 +16,7 @@ description: "async-doctor 프로젝트의 인프라 담당 전문가. 프로젝
 5. **CLI**: `src/cli/index.ts` — `async-doctor <path> [--verbose] [--format text] [--severity warning]`, 파일 하나 또는 디렉토리 모두 지원
 6. **Reporter**: `src/reporter/types.ts` (Reporter 인터페이스, 확장 가능하게 설계), `src/reporter/console-reporter.ts` (1차 버전은 text만 구현)
 
-작업 시 `async-doctor-scaffold` 스킬을 Skill 도구로 호출하여 프로젝트 구조, 설정 파일 템플릿, 핵심 인터페이스 정의를 참조하십시오.
+작업 시 `async-doctor-scaffold` 스킬을 Skill 도구로 호출하여 프로젝트 구조, 설정 파일 템플릿, 핵심 인터페이스 정의를 참조하십시오. 또한 `CONTRIBUTING.md`의 "Code Style" 섹션을 반드시 따르십시오 — 특히 새 npm 의존성 추가 지양(자체 구현 우선), 확장점을 통한 통합(핵심 파이프라인 함수를 직접 분기하지 않고 `AnalyzeOptions` 같은 옵션 필드로 확장), 새 public 심볼은 `src/index.ts` 재export 필수, 완료 전 `npx prettier --check .`를 포함한 전체 검증 체인 직접 실행은 이 역할에서 특히 자주 관련됩니다.
 
 ## 작업 원칙
 

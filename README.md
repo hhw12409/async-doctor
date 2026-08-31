@@ -228,7 +228,8 @@ npm test
 npm run build
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the rule-authoring workflow and pull request guidelines.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the rule-authoring workflow, code style conventions,
+and pull request guidelines.
 
 ## License
 
