@@ -7,6 +7,7 @@
  * import해도 CLI가 실행되지 않는다.
  */
 import { analyze } from "../analyzer/analyzer.js";
+import { applyFixes } from "../analyzer/fixer.js";
 import { collectFiles, filterIgnored } from "../analyzer/file-discovery.js";
 import { loadConfig } from "../core/config.js";
 import { VERSION } from "../core/package-info.js";
@@ -16,6 +17,7 @@ import { consoleReporter } from "../reporter/console-reporter.js";
 import { htmlReporter } from "../reporter/html-reporter.js";
 import { jsonReporter } from "../reporter/json-reporter.js";
 import { sarifReporter } from "../reporter/sarif-reporter.js";
+import { relativePath } from "../reporter/shared.js";
 import { REPORT_FORMATS } from "../reporter/types.js";
 import type { Reporter, ReportFormat } from "../reporter/types.js";
 import type { AsyncDoctorRule, Severity } from "../core/types.js";
@@ -45,6 +47,10 @@ export interface CliOptions {
    */
   format?: ReportFormat;
   severity?: Severity;
+  /** --fix: fix가 있는 finding을 실제로 파일에 적용한다 */
+  fix: boolean;
+  /** --fix-dry-run: 아무것도 쓰지 않고 몇 개가/어디가 고쳐질지만 미리 보여준다 */
+  fixDryRun: boolean;
   help: boolean;
   version: boolean;
 }
@@ -64,6 +70,8 @@ Options:
   --verbose              Include the offending code snippet in the output
   --format <format>      Output format: text (default), json, sarif, html
   --severity <level>     Only report findings at or above this level: error | warning | info
+  --fix                  Apply automatic fixes for findings that support them, then re-analyze
+  --fix-dry-run          Preview what --fix would change without writing any files
   -h, --help             Show this help
   -v, --version          Show version
 
@@ -72,13 +80,19 @@ Config:
   and configure "ignore" globs or per-rule overrides. CLI flags always win.
   See the README's "Config File" section for the schema.
 
+Auto-fix:
+  Only findings that carry a fix (currently just no-floating-promise) are ever touched.
+  --fix and --fix-dry-run cannot be combined. See the README's "Auto-fixing" section.
+
 Examples:
   async-doctor src
   async-doctor src/user.service.ts --verbose
   async-doctor src --severity warning --format text
   async-doctor src --format json
   async-doctor src --format sarif > async-doctor.sarif
-  async-doctor src --format html > report.html`;
+  async-doctor src --format html > report.html
+  async-doctor src --fix-dry-run
+  async-doctor src --fix`;
 
 function readValue(argv: string[], index: number, flag: string): string {
   const inlineIndex = argv[index].indexOf("=");
@@ -100,6 +114,8 @@ export function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     path: "",
     verbose: false,
+    fix: false,
+    fixDryRun: false,
     help: false,
     version: false,
   };
@@ -123,6 +139,14 @@ export function parseArgs(argv: string[]): CliOptions {
 
       case "--verbose":
         options.verbose = true;
+        break;
+
+      case "--fix":
+        options.fix = true;
+        break;
+
+      case "--fix-dry-run":
+        options.fixDryRun = true;
         break;
 
       case "--format": {
@@ -161,6 +185,10 @@ export function parseArgs(argv: string[]): CliOptions {
 
   if (positional !== undefined) {
     options.path = positional;
+  }
+
+  if (options.fix && options.fixDryRun) {
+    throw new CliError("--fix and --fix-dry-run cannot be used together.");
   }
 
   return options;
@@ -260,19 +288,55 @@ export function run(argv: string[]): number {
     if (value !== "off") severityOverrides[name] = value;
   }
 
+  const analyzeOptions = {
+    severityThreshold: severity,
+    rules: activeRules,
+    severityOverrides,
+  };
+
   let findings;
   try {
-    findings = analyze(files, {
-      severityThreshold: severity,
-      rules: activeRules,
-      severityOverrides,
-    });
+    findings = analyze(files, analyzeOptions);
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     return 2;
   }
 
-  process.stdout.write(`${reporter.report(findings, { verbose: options.verbose })}\n`);
+  // reportFindings는 stdout에 실제로 찍힐(=exit code 판정에도 쓰일) 최종 findings다.
+  // --fix로 뭔가 실제로 고쳐진 경우에만 아래에서 재분석 결과로 교체된다. 그 외의 모든
+  // 경로(플래그 없음, --fix-dry-run, --fix인데 고칠 게 없었음)는 findings 그대로 유지되므로
+  // "--fix-dry-run은 플래그 없을 때와 exit code가 완전히 같아야 한다"는 요구가 자연히 성립한다.
+  let reportFindings = findings;
 
-  return findings.length > 0 ? 1 : 0;
+  if (options.fix || options.fixDryRun) {
+    const fixResult = applyFixes(findings, { dryRun: options.fixDryRun });
+
+    if (options.fixDryRun) {
+      if (fixResult.fixedCount > 0) {
+        const preview = findings
+          .filter((finding) => finding.fix !== undefined)
+          .map((finding) => `  ${relativePath(finding.file)}:${finding.line} ${finding.rule}`)
+          .join("\n");
+        process.stderr.write(
+          `Would fix ${fixResult.fixedCount} finding(s) in ${fixResult.fixedFiles.length} file(s):\n${preview}\n`,
+        );
+      }
+    } else if (fixResult.fixedCount > 0) {
+      // "고쳤다고 주장"하지 않는다 — 같은 파일 목록을 다시 analyze()해서 고친 finding이
+      // 정말 사라졌는지, 부작용으로 새 finding이 생기지 않았는지 실제로 재검증한다.
+      try {
+        reportFindings = analyze(files, analyzeOptions);
+      } catch (error) {
+        process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+        return 2;
+      }
+      process.stderr.write(
+        `Fixed ${fixResult.fixedCount} finding(s) in ${fixResult.fixedFiles.length} file(s).\n`,
+      );
+    }
+  }
+
+  process.stdout.write(`${reporter.report(reportFindings, { verbose: options.verbose })}\n`);
+
+  return reportFindings.length > 0 ? 1 : 0;
 }

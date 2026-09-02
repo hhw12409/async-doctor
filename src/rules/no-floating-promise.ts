@@ -109,6 +109,10 @@ export const noFloatingPromiseRule: AsyncDoctorRule = {
           `${callText}.catch((error) => { /* handle or log */ });  // if it's intentionally fire-and-forget`,
         ],
         code: callText,
+        fix: {
+          insertAt: expression.getStart(),
+          text: "void ",
+        },
       });
     }
 

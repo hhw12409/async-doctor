@@ -110,6 +110,8 @@ describe("CLI — 인자 파싱", () => {
     expect(options).toEqual({
       path: "src",
       verbose: false,
+      fix: false,
+      fixDryRun: false,
       help: false,
       version: false,
     });

@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -15,6 +16,20 @@ function analyzeFixture(name: string): Finding[] {
   return analyze([path.join(FIXTURE_DIR, `${name}.ts`)], { rules: [noFloatingPromiseRule] });
 }
 
+/**
+ * fixture 파일 안에서 substring이 마지막으로 시작하는 0-based 문자 오프셋 —
+ * finding.fix.insertAt 기대값 계산용. lastIndexOf를 쓰는 이유: 이 fixture들은 맨 위에
+ * `declare function foo(): Promise<...>;` 선언을 두는데, 그 시그니처 텍스트 안에도
+ * `foo()`와 같은 형태의 부분 문자열이 우연히 포함될 수 있어(예: 매개변수 없는 함수),
+ * 실제 호출식은 항상 파일의 더 뒤쪽(선언 다음)에 있으므로 마지막 occurrence를 취한다.
+ */
+function offsetOf(fixtureName: string, substring: string): number {
+  const content = fs.readFileSync(path.join(FIXTURE_DIR, `${fixtureName}.ts`), "utf8");
+  const idx = content.lastIndexOf(substring);
+  if (idx === -1) throw new Error(`substring not found in ${fixtureName}.ts: ${substring}`);
+  return idx;
+}
+
 describe("no-floating-promise", () => {
   describe("positive — 탐지되어야 하는 패턴", () => {
     it("async 함수 호출이 표현식문으로 버려지면 호출 표현식 시작 위치에서 탐지한다", () => {
@@ -30,6 +45,10 @@ describe("no-floating-promise", () => {
         "Promise-returning call result is discarded (floating promise).",
       );
       expect(findings[0].code).toBe("doSomethingAsync()");
+      expect(findings[0].fix).toEqual({
+        insertAt: offsetOf("positive-async-call", "doSomethingAsync()"),
+        text: "void ",
+      });
     });
 
     it("async 키워드 없이 반환 타입만 Promise<T>인 함수 호출도 탐지한다", () => {
@@ -41,6 +60,10 @@ describe("no-floating-promise", () => {
       expect(findings[0].line).toBe(4);
       expect(findings[0].column).toBe(3);
       expect(findings[0].code).toBe("returnsPromiseNonAsync()");
+      expect(findings[0].fix).toEqual({
+        insertAt: offsetOf("positive-non-async-promise-return", "returnsPromiseNonAsync()"),
+        text: "void ",
+      });
     });
 
     it(".finally()만 체이닝되고 .catch()/.then()이 없으면 여전히 탐지한다", () => {
@@ -52,6 +75,15 @@ describe("no-floating-promise", () => {
       expect(findings[0].line).toBe(4);
       expect(findings[0].column).toBe(3);
       expect(findings[0].code).toBe('doSomethingAsync().finally(() => console.log("cleanup"))');
+      // fix.insertAt은 체인 전체가 아니라 호출식(`doSomethingAsync()...`) 시작 위치를 가리켜야
+      // `void `가 `.finally()` 체인 앞이 아니라 최상위 표현식 맨 앞에 삽입된다.
+      expect(findings[0].fix).toEqual({
+        insertAt: offsetOf(
+          "positive-finally-only",
+          'doSomethingAsync().finally(() => console.log("cleanup"))',
+        ),
+        text: "void ",
+      });
     });
 
     it("Finding에 await/.catch() 두 가지 제안을 모두 담는다", () => {

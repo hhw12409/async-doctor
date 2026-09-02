@@ -27,6 +27,19 @@ export interface Finding {
   suggestion?: string[];
   /** 문제 지점의 소스 스니펫. --verbose일 때만 출력된다 */
   code?: string;
+  /**
+   * 자동 수정 가능한 경우에만 존재한다. `insertAt` 위치에 `text`를 삽입하면 이 finding이
+   * 해소된다 — range-replace(기존 텍스트 대체)가 아니라 순수 삽입만 지원한다. rule이
+   * 원본 텍스트를 훼손하지 않고 표현할 수 있는 수정만 이 필드로 서술해야 한다(예:
+   * `no-floating-promise`의 `void ` 삽입). 구조 재작성이 필요한 제안은 이 필드를 채우지
+   * 않는다 — `fix`가 없는 finding은 `applyFixes()`가 그냥 건너뛴다.
+   */
+  fix?: {
+    /** 삽입 위치 (0-based 문자 오프셋, ts-morph `Node.getStart()` 값과 동일한 좌표계) */
+    insertAt: number;
+    /** 삽입할 텍스트 */
+    text: string;
+  };
 }
 
 /**

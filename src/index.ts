@@ -13,9 +13,11 @@ export { meetsThreshold, compareSeverity, isSeverity, SEVERITIES } from "./core/
 export { loadConfig, ConfigError, CONFIG_FILE_NAME } from "./core/config.js";
 export type { AsyncDoctorConfig } from "./core/config.js";
 
-export { analyze, sortFindings } from "./analyzer/analyzer.js";
+export { analyze, sortFindings, createProject } from "./analyzer/analyzer.js";
 export type { AnalyzeOptions } from "./analyzer/analyzer.js";
 export { createContext } from "./analyzer/context.js";
+export { applyFixes } from "./analyzer/fixer.js";
+export type { FixResult } from "./analyzer/fixer.js";
 export { collectSuppressions, isSuppressed } from "./analyzer/suppressions.js";
 export type { Suppression } from "./analyzer/suppressions.js";
 export {

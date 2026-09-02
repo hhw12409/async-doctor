@@ -36,6 +36,7 @@ const [user, posts] = await Promise.all([getUser(id), getPosts(id)]);
 - [Config File](#config-file)
 - [Rules](#rules)
 - [Suppressing Findings](#suppressing-findings)
+- [Auto-fixing](#auto-fixing)
 - [Output Formats](#output-formats)
 - [Programmatic API](#programmatic-api)
 - [Architecture](#architecture)
@@ -63,6 +64,10 @@ async-doctor <path> [--verbose] [--format text] [--severity warning]
 - `--verbose` — also print the offending code snippet.
 - `--format <format>` — output format: `text` (default), `json`, `sarif`, or `html`.
 - `--severity <level>` — only report findings at or above `error` > `warning` > `info`.
+- `--fix` — apply automatic fixes, then re-analyze and report the result. See
+  [Auto-fixing](#auto-fixing).
+- `--fix-dry-run` — preview what `--fix` would change without writing anything. Cannot be
+  combined with `--fix`.
 
 ```bash
 async-doctor src
@@ -71,6 +76,8 @@ async-doctor src --severity warning
 async-doctor src --format json
 async-doctor src --format sarif > async-doctor.sarif
 async-doctor src --format html > report.html
+async-doctor src --fix-dry-run
+async-doctor src --fix
 ```
 
 Exit codes: `0` no findings, `1` findings reported, `2` usage or runtime error.
@@ -144,6 +151,35 @@ const posts = await getPosts(id);
 Suppression comments are always on — there's no flag to disable them. A misspelled rule name
 suppresses nothing (no error); double-check the name against the [Rules](#rules) table above.
 
+## Auto-fixing
+
+`--fix` writes changes to disk; `--fix-dry-run` only previews them. **As of this version, only
+[`no-floating-promise`](#rules) supports auto-fix** — its fix is a single, narrow insertion
+(`getUser(id);` → `void getUser(id);`) that never touches the original call expression's text.
+The other four rules' suggestions all require structural rewrites (wrapping calls in
+`Promise.all`, converting a loop to `for...of`, etc.) that need human judgment about intent, so
+applying them automatically risks corrupting working code if the finding was a false positive —
+they're intentionally excluded from auto-fix in this version.
+
+```bash
+async-doctor src --fix-dry-run   # preview only, never writes a file
+async-doctor src --fix           # apply fixes, then re-analyze and report the result
+```
+
+- `--fix` re-runs analysis on the fixed files after writing, so the report reflects what's
+  actually on disk — not just what the tool intended to change.
+- `--fix-dry-run` never writes a file (verified byte-for-byte in this project's test suite) and
+  always reports the original findings with the original exit code, so it's safe to run in any
+  context, including CI.
+- A finding suppressed by an [inline comment](#suppressing-findings) or a rule turned `"off"` in
+  the [config file](#config-file) is never analyzed in the first place, so it's never a fix
+  candidate either.
+- Running `--fix` twice in a row is safe: the second run finds nothing left to fix.
+
+Exit codes with `--fix`/`--fix-dry-run` follow the same rule as always (`0` no findings, `1`
+findings reported), evaluated against the findings that are actually reported: the re-analyzed
+result for `--fix`, the original findings for `--fix-dry-run`.
+
 ## Output Formats
 
 | Format  | Use case                                                                                                 | Path style           |
@@ -165,6 +201,17 @@ const findings = analyze(collectFiles("src"), { severityThreshold: "warning" });
 console.log(consoleReporter.report(findings, { verbose: true }));
 ```
 
+`applyFixes(findings, { dryRun })` applies any `Finding.fix` insertions to disk (or, with
+`dryRun: true`, just reports what it would do without writing anything):
+
+```ts
+import { analyze, applyFixes, collectFiles } from "async-doctor";
+
+const files = collectFiles("src");
+const result = applyFixes(analyze(files), { dryRun: false });
+console.log(`Fixed ${result.fixedCount} finding(s) in ${result.fixedFiles.length} file(s).`);
+```
+
 ## Architecture
 
 ```
@@ -176,6 +223,7 @@ src/
     context.ts             builds the AnalysisContext handed to each rule
     file-discovery.ts      path -> file list, SUPPORTED_EXTENSIONS, filterIgnored() (ignore globs)
     suppressions.ts        inline disable-comment parsing (rule-agnostic)
+    fixer.ts               applyFixes(): writes Finding.fix insertions to disk (--fix / --fix-dry-run)
   rules/index.ts           rule registry (the extension point)
   reporter/
     types.ts               Reporter interface, ReportFormat, REPORT_FORMATS

@@ -24,7 +24,13 @@ export interface AnalyzeOptions {
   severityOverrides?: Partial<Record<string, Severity>>;
 }
 
-function createProject(): Project {
+/**
+ * export된 이유: `fixer.ts`가 fix를 적용할 때 동일한 컴파일러 옵션으로 파일을 열어야
+ * `analyze()`가 본 것과 같은 방식으로 텍스트 삽입 위치를 해석한다. 옵션을 두 곳에
+ * 따로 하드코딩하면 언젠가 드리프트해 fix 위치가 어긋나는 버그로 이어질 수 있어
+ * 하나의 정의를 공유한다 — `analyze()` 함수 자체의 동작은 바뀌지 않는다.
+ */
+export function createProject(): Project {
   return new Project({
     skipAddingFilesFromTsConfig: true,
     skipFileDependencyResolution: true,
