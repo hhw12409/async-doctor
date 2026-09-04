@@ -117,7 +117,7 @@ describe("sarif-reporter", () => {
       }
     });
 
-    it("현재 등록된 다섯 rule이 등록 순서대로 노출된다", () => {
+    it("현재 등록된 여섯 rule이 등록 순서대로 노출된다", () => {
       const ids = reportAndParse([]).runs[0].tool.driver.rules.map((r) => r.id);
 
       expect(ids).toEqual([
@@ -126,6 +126,7 @@ describe("sarif-reporter", () => {
         "no-foreach-async",
         "no-async-reduce",
         "no-floating-promise",
+        "sequential-then",
       ]);
     });
   });

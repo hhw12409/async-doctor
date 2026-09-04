@@ -120,13 +120,14 @@ silently ignoring mistakes in it would be more confusing than failing loudly.
 
 ## Rules
 
-| Rule                                                      | Detects                                                                                                                                                                          | Severity  |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| [`sequential-await`](src/rules/sequential-await.ts)       | Consecutive `await`s that don't depend on each other's results and could run in parallel via `Promise.all`.                                                                      | `warning` |
-| [`no-await-in-loop`](src/rules/no-await-in-loop.ts)       | `await` expressions executed one iteration at a time inside a loop instead of batched.                                                                                           | `warning` |
-| [`no-foreach-async`](src/rules/no-foreach-async.ts)       | `array.forEach(async (item) => { await ... })` — `forEach` never awaits the callback's promise, so errors are swallowed and ordering isn't guaranteed.                           | `warning` |
-| [`no-async-reduce`](src/rules/no-async-reduce.ts)         | `array.reduce(async (acc, item) => { await ... })` — an async reducer awaits the previous iteration's accumulator promise, forcing every item to run strictly one after another. | `warning` |
-| [`no-floating-promise`](src/rules/no-floating-promise.ts) | A Promise-returning call left as a bare statement — not awaited, returned, stored, or chained with `.then()`/`.catch()` — so a rejection becomes an unhandled rejection.         | `warning` |
+| Rule                                                      | Detects                                                                                                                                                                                                    | Severity  |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| [`sequential-await`](src/rules/sequential-await.ts)       | Consecutive `await`s that don't depend on each other's results and could run in parallel via `Promise.all`.                                                                                                | `warning` |
+| [`no-await-in-loop`](src/rules/no-await-in-loop.ts)       | `await` expressions executed one iteration at a time inside a loop instead of batched.                                                                                                                     | `warning` |
+| [`no-foreach-async`](src/rules/no-foreach-async.ts)       | `array.forEach(async (item) => { await ... })` — `forEach` never awaits the callback's promise, so errors are swallowed and ordering isn't guaranteed.                                                     | `warning` |
+| [`no-async-reduce`](src/rules/no-async-reduce.ts)         | `array.reduce(async (acc, item) => { await ... })` — an async reducer awaits the previous iteration's accumulator promise, forcing every item to run strictly one after another.                           | `warning` |
+| [`no-floating-promise`](src/rules/no-floating-promise.ts) | A Promise-returning call left as a bare statement — not awaited, returned, stored, or chained with `.then()`/`.catch()` — so a rejection becomes an unhandled rejection.                                   | `warning` |
+| [`sequential-then`](src/rules/sequential-then.ts)         | `a().then(x => b().then(y => ...))` — an independent `.then()` chain nested inside another `.then()` callback, forcing it to wait for the outer promise even though it doesn't depend on the outer result. | `warning` |
 
 Static analysis can't see runtime side effects, so every finding is a `warning`: fix the ones that
 apply, and keep the sequential form where the calls genuinely share state.
@@ -156,7 +157,7 @@ suppresses nothing (no error); double-check the name against the [Rules](#rules)
 `--fix` writes changes to disk; `--fix-dry-run` only previews them. **As of this version, only
 [`no-floating-promise`](#rules) supports auto-fix** — its fix is a single, narrow insertion
 (`getUser(id);` → `void getUser(id);`) that never touches the original call expression's text.
-The other four rules' suggestions all require structural rewrites (wrapping calls in
+The other five rules' suggestions all require structural rewrites (wrapping calls in
 `Promise.all`, converting a loop to `for...of`, etc.) that need human judgment about intent, so
 applying them automatically risks corrupting working code if the finding was a false positive —
 they're intentionally excluded from auto-fix in this version.
