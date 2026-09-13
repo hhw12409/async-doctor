@@ -1,0 +1,84 @@
+name: "async-doctor"
+description: "Detect sequential async bottlenecks in Node.js/TypeScript code and optionally feed results into GitHub Code Scanning."
+branding:
+  icon: "zap"
+  color: "yellow"
+
+inputs:
+  path:
+    description: "File or directory to analyze."
+    required: false
+    default: "."
+  severity:
+    description: "Only report findings at or above this level: error | warning | info. Leave empty for no threshold."
+    required: false
+    default: ""
+  fail-on-findings:
+    description: "Whether the step should fail when async-doctor reports findings. Set to 'false' to only surface results via the SARIF output (e.g. when relying on Code Scanning instead of a failed check)."
+    required: false
+    default: "true"
+  sarif-file:
+    description: "Path to write the SARIF report to."
+    required: false
+    default: "async-doctor-results.sarif"
+
+outputs:
+  sarif-file:
+    description: "Path to the generated SARIF file, for chaining into github/codeql-action/upload-sarif."
+    value: ${{ steps.run-async-doctor.outputs.sarif-file }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Run async-doctor
+      id: run-async-doctor
+      shell: bash
+      env:
+        AD_PATH: ${{ inputs.path }}
+        AD_SEVERITY: ${{ inputs.severity }}
+        AD_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
+        AD_SARIF_FILE: ${{ inputs.sarif-file }}
+      run: |
+        set +e
+
+        # action.yml이 체크아웃된 시점의 package.json 버전을 그대로 npx에 고정해,
+        # "Action 태그"와 "실행되는 npm 패키지 버전"이 항상 정확히 일치하게 한다
+        # (드리프트가 구조적으로 생길 수 없다 — 사용자가 버전을 따로 지정할 필요도 없다).
+        AD_VERSION=$(node -p "require('${{ github.action_path }}/package.json').version")
+        echo "Resolved async-doctor version: $AD_VERSION"
+
+        SEVERITY_ARGS=()
+        if [ -n "$AD_SEVERITY" ]; then
+          SEVERITY_ARGS=(--severity "$AD_SEVERITY")
+        fi
+
+        # CLI는 --format sarif의 리포트 본문을 stdout에, 진행 로그를 stderr에 쓴다.
+        # stdout만 파일로 리다이렉트하면 SARIF 문서가 로그로 오염되지 않는다.
+        npx --yes "async-doctor@${AD_VERSION}" "$AD_PATH" --format sarif "${SEVERITY_ARGS[@]}" > "$AD_SARIF_FILE"
+        EXIT_CODE=$?
+
+        echo "sarif-file=$AD_SARIF_FILE" >> "$GITHUB_OUTPUT"
+
+        # exit code 의미론(src/cli/index.ts run()): 0=findings 없음, 1=findings 있음, 2=도구 자체 오류.
+        # 2는 fail-on-findings 설정과 무관하게 항상 step을 실패시킨다.
+        if [ "$EXIT_CODE" -eq 2 ]; then
+          echo "::error::async-doctor exited with a tool error (exit code $EXIT_CODE). Check the log above."
+          exit 1
+        fi
+
+        if [ "$EXIT_CODE" -eq 1 ]; then
+          if [ "$AD_FAIL_ON_FINDINGS" = "true" ]; then
+            echo "::error::async-doctor reported findings (fail-on-findings=true). See $AD_SARIF_FILE."
+            exit 1
+          fi
+          echo "async-doctor reported findings, but fail-on-findings=false — continuing. See $AD_SARIF_FILE."
+          exit 0
+        fi
+
+        echo "async-doctor found no findings."
+        exit 0

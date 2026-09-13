@@ -38,6 +38,7 @@ const [user, posts] = await Promise.all([getUser(id), getPosts(id)]);
 - [Suppressing Findings](#suppressing-findings)
 - [Auto-fixing](#auto-fixing)
 - [Output Formats](#output-formats)
+- [GitHub Action](#github-action)
 - [Programmatic API](#programmatic-api)
 - [Architecture](#architecture)
 - [Development](#development)
@@ -193,6 +194,67 @@ result for `--fix`, the original findings for `--fix-dry-run`.
 `--format json` always prints a valid document, even with zero findings. `--format sarif` and
 `--format html` additionally embed the offending snippet via `--verbose`.
 
+## GitHub Action
+
+`async-doctor` ships as a composite action (`action.yml` at the repo root) so other repos can run
+it in CI without installing anything themselves. The action pins itself to the exact npm version
+matching the action tag you use — checking out `@v1` runs whatever version `package.json` has at
+that tag, so there's never a drift between "the Action version" and "the npm version it runs."
+
+| Input              | Default                        | Description                                                                              |
+| ------------------ | ------------------------------ | ---------------------------------------------------------------------------------------- |
+| `path`             | `.`                            | File or directory to analyze                                                             |
+| `severity`         | `''`                           | Only report findings at or above this level: `error` \| `warning` \| `info`              |
+| `fail-on-findings` | `'true'`                       | Fail the step when findings are reported. Set to `'false'` to rely on Code Scanning only |
+| `sarif-file`       | `'async-doctor-results.sarif'` | Where to write the SARIF report                                                          |
+
+Output: `sarif-file` — the path the SARIF report was written to, for chaining into
+`github/codeql-action/upload-sarif`.
+
+Basic usage — fail the check when findings are reported:
+
+```yaml
+name: async-doctor
+on: [pull_request]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hhw12409/async-doctor@v1
+        with:
+          path: src
+```
+
+Recommended pattern for Code Scanning — don't fail the check, surface findings as PR annotations
+instead:
+
+```yaml
+name: async-doctor
+on: [pull_request]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hhw12409/async-doctor@v1
+        id: async-doctor
+        with:
+          path: src
+          fail-on-findings: "false"
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.async-doctor.outputs.sarif-file }}
+```
+
+With `fail-on-findings: false`, the workflow always continues (unless async-doctor itself errors),
+and findings show up as inline PR annotations from Code Scanning instead of a failed check.
+
 ## Programmatic API
 
 ```ts
@@ -216,6 +278,7 @@ console.log(`Fixed ${result.fixedCount} finding(s) in ${result.fixedFiles.length
 ## Architecture
 
 ```
+action.yml                 composite GitHub Action (uses: hhw12409/async-doctor@v1)
 src/
   cli/index.ts             argument parsing + pure run() (no side effects on import)
   cli/bin.ts               thin executable entrypoint (shebang, calls run())
