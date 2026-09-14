@@ -12,6 +12,8 @@
 
 **Static analysis for the async bottlenecks your linter doesn't catch.**
 
+**English** | [한국어](./README.ko.md)
+
 </div>
 
 ---
