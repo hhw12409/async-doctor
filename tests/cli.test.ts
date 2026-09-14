@@ -328,6 +328,52 @@ describe("CLI — run() 통합", () => {
     });
   });
 
+  describe("--format junit", () => {
+    it("exit 1과 함께 findings를 담은 JUnit XML 문서를 낸다", () => {
+      const { exitCode, stdout, stderr } = invoke([BOTTLENECK, "--format", "junit"]);
+
+      expect(exitCode).toBe(1);
+      expect(stderr).toBe("");
+      expect(stdout.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n<testsuites>')).toBe(true);
+      expect(stdout).toContain('name="sequential-await (7:3)"');
+      expect(stdout).toContain('name="no-await-in-loop (12:5)"');
+      expect(stdout).toContain('tests="2"');
+      expect(stdout).toContain('failures="2"');
+      expect(stdout).toContain('errors="0"');
+      expect(stdout).toContain(
+        `classname="${path.relative(process.cwd(), BOTTLENECK).split(path.sep).join("/")}"`,
+      );
+    });
+
+    it("0건이어도 exit 0과 함께 self-closing <testsuites/> 루트를 낸다", () => {
+      const { exitCode, stdout } = invoke([CLEAN, "--format=junit"]);
+
+      // CLI의 run()은 reporter 출력 뒤에 항상 개행을 하나 더 붙인다(다른 format도 동일) —
+      // 리포터 자체의 계약(junitReporter.report())은 junit-reporter.test.ts에서 완전 일치로 검증한다.
+      expect(exitCode).toBe(0);
+      expect(stdout).toBe('<?xml version="1.0" encoding="UTF-8"?>\n<testsuites/>\n\n');
+    });
+
+    it("--verbose일 때만 'Code:' 스니펫이 failure 본문에 붙는다", () => {
+      const plain = invoke([BOTTLENECK, "--format", "junit"]).stdout;
+      const verbose = invoke([BOTTLENECK, "--format", "junit", "--verbose"]).stdout;
+
+      expect(plain).not.toContain("Code:");
+      expect(plain).not.toContain("await processItem(order);");
+      expect(verbose).toContain("Code:");
+      expect(verbose).toContain("await processItem(order);");
+    });
+
+    it("--verbose를 붙여도 stdout은 여전히 JUnit XML이다 (진행 로그는 stderr)", () => {
+      const { exitCode, stdout, stderr } = invoke([BOTTLENECK, "--format", "junit", "--verbose"]);
+
+      expect(exitCode).toBe(1);
+      expect(stdout.startsWith('<?xml version="1.0"')).toBe(true);
+      expect(stdout).not.toContain("Analyzing");
+      expect(stderr).toContain("Analyzing 1 file(s)...");
+    });
+  });
+
   describe("--format 검증", () => {
     it("KNOWN_FORMATS에 없는 값은 파싱 단계에서 exit 2로 막힌다", () => {
       const { exitCode, stdout, stderr } = invoke([BOTTLENECK, "--format", "xml"]);
@@ -348,7 +394,7 @@ describe("CLI — run() 통합", () => {
       expect(short.stdout).toBe(long.stdout);
       expect(short.stdout).toContain("Usage:");
       expect(short.stdout).toContain("--format <format>");
-      expect(short.stdout).toContain("text (default), json, sarif, html");
+      expect(short.stdout).toContain("text (default), json, sarif, html, junit");
       expect(short.stderr).toBe("");
     });
 

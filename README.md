@@ -63,7 +63,7 @@ async-doctor <path> [--verbose] [--format text] [--severity warning]
 - `<path>` — a single file or a directory (recursively scanned). Supported extensions:
   `.ts .tsx .js .jsx .mts .cts`.
 - `--verbose` — also print the offending code snippet.
-- `--format <format>` — output format: `text` (default), `json`, `sarif`, or `html`.
+- `--format <format>` — output format: `text` (default), `json`, `sarif`, `html`, or `junit`.
 - `--severity <level>` — only report findings at or above `error` > `warning` > `info`.
 - `--fix` — apply automatic fixes, then re-analyze and report the result. See
   [Auto-fixing](#auto-fixing).
@@ -77,6 +77,7 @@ async-doctor src --severity warning
 async-doctor src --format json
 async-doctor src --format sarif > async-doctor.sarif
 async-doctor src --format html > report.html
+async-doctor src --format junit > junit.xml
 async-doctor src --fix-dry-run
 async-doctor src --fix
 ```
@@ -190,9 +191,10 @@ result for `--fix`, the original findings for `--fix-dry-run`.
 | `json`  | CI/tooling consumption — `{ asyncDoctorVersion, summary, findings }`                                     | absolute             |
 | `sarif` | Upload straight to [GitHub Code Scanning](https://sarifweb.azurewebsites.net/) for inline PR annotations | repo-relative, POSIX |
 | `html`  | Self-contained single-file report to share or archive                                                    | relative to cwd      |
+| `junit` | Native test-result UI in Jenkins/GitLab CI/CircleCI and other non-GitHub CI dashboards                   | relative to cwd      |
 
-`--format json` always prints a valid document, even with zero findings. `--format sarif` and
-`--format html` additionally embed the offending snippet via `--verbose`.
+`--format json` always prints a valid document, even with zero findings. `--format sarif`,
+`--format html` and `--format junit` additionally embed the offending snippet via `--verbose`.
 
 ## GitHub Action
 
@@ -296,6 +298,7 @@ src/
     json-reporter.ts       machine-readable JSON output
     sarif-reporter.ts      SARIF 2.1.0 output (GitHub Code Scanning)
     html-reporter.ts       self-contained single-file HTML output
+    junit-reporter.ts      JUnit XML output (Jenkins/GitLab CI/CircleCI)
   core/
     types.ts               Severity, Finding, AnalysisContext, AsyncDoctorRule
     severity.ts            severity ranking + threshold filtering

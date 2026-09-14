@@ -16,6 +16,7 @@ import { rules as ruleRegistry } from "../rules/index.js";
 import { consoleReporter } from "../reporter/console-reporter.js";
 import { htmlReporter } from "../reporter/html-reporter.js";
 import { jsonReporter } from "../reporter/json-reporter.js";
+import { junitReporter } from "../reporter/junit-reporter.js";
 import { sarifReporter } from "../reporter/sarif-reporter.js";
 import { relativePath } from "../reporter/shared.js";
 import { REPORT_FORMATS } from "../reporter/types.js";
@@ -32,6 +33,7 @@ const REPORTERS: Partial<Record<ReportFormat, Reporter>> = {
   json: jsonReporter,
   sarif: sarifReporter,
   html: htmlReporter,
+  junit: junitReporter,
 };
 
 const KNOWN_FORMATS = REPORT_FORMATS;
@@ -68,7 +70,7 @@ Arguments:
 
 Options:
   --verbose              Include the offending code snippet in the output
-  --format <format>      Output format: text (default), json, sarif, html
+  --format <format>      Output format: text (default), json, sarif, html, junit
   --severity <level>     Only report findings at or above this level: error | warning | info
   --fix                  Apply automatic fixes for findings that support them, then re-analyze
   --fix-dry-run          Preview what --fix would change without writing any files
@@ -91,6 +93,7 @@ Examples:
   async-doctor src --format json
   async-doctor src --format sarif > async-doctor.sarif
   async-doctor src --format html > report.html
+  async-doctor src --format junit > junit.xml
   async-doctor src --fix-dry-run
   async-doctor src --fix`;
 
